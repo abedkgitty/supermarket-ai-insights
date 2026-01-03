@@ -9,7 +9,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   ShoppingCart,
-  BarChart3
+  BarChart3,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +18,7 @@ const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: Package, label: 'Products', path: '/products' },
   { icon: Map, label: 'Store Map', path: '/store-map' },
+  { icon: Users, label: 'Customers', path: '/customer-analytics' },
   { icon: Brain, label: 'AI Insights', path: '/ai-insights' },
 ];
 

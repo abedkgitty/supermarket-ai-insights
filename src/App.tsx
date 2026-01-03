@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Products from "./pages/Products";
 import StoreMap from "./pages/StoreMap";
 import AIInsights from "./pages/AIInsights";
+import CustomerAnalytics from "./pages/CustomerAnalytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/products" element={<Products />} />
           <Route path="/store-map" element={<StoreMap />} />
           <Route path="/ai-insights" element={<AIInsights />} />
+          <Route path="/customer-analytics" element={<CustomerAnalytics />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
