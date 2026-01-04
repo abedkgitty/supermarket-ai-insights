@@ -1,30 +1,35 @@
 import { motion } from 'framer-motion';
 import { useAisles } from '@/hooks/useAisles';
 import { useProducts } from '@/hooks/useProducts';
-import { useCategories } from '@/hooks/useCategories';
 import { useState } from 'react';
-import { MapPin, Package } from 'lucide-react';
+import { MapPin, Package, Store } from 'lucide-react';
 
 const aisleColors: Record<string, string> = {
-  'Produce': 'hsl(142, 76%, 36%)',
-  'Dairy': 'hsl(217, 91%, 50%)',
-  'Bakery': 'hsl(38, 92%, 50%)',
-  'Meat & Seafood': 'hsl(0, 84%, 60%)',
-  'Frozen Foods': 'hsl(190, 80%, 45%)',
+  'Dairy & Refrigerated': 'hsl(217, 91%, 50%)',
+  'Bakery & Bread': 'hsl(38, 92%, 50%)',
+  'Grains & Rice': 'hsl(45, 80%, 45%)',
+  'Oils & Cooking': 'hsl(25, 85%, 55%)',
+  'Spices & Seasonings': 'hsl(15, 75%, 50%)',
+  'Meat & Proteins': 'hsl(0, 84%, 60%)',
+  'Breakfast Foods': 'hsl(48, 90%, 50%)',
+  'Spreads & Sweets': 'hsl(330, 80%, 55%)',
+  'Snacks': 'hsl(280, 70%, 55%)',
   'Beverages': 'hsl(271, 81%, 56%)',
-  'Snacks': 'hsl(330, 80%, 60%)',
-  'Household': 'hsl(220, 10%, 46%)',
+  'Condiments': 'hsl(160, 60%, 45%)',
+  'Canned Goods': 'hsl(200, 50%, 50%)',
+  'Frozen Foods': 'hsl(190, 80%, 45%)',
+  'Cleaning Supplies': 'hsl(220, 40%, 50%)',
+  'Personal Care': 'hsl(300, 50%, 55%)',
 };
 
 export function StoreMap() {
   const { data: aisles, isLoading: aislesLoading } = useAisles();
   const { data: products } = useProducts();
-  const { data: categories } = useCategories();
   const [selectedAisle, setSelectedAisle] = useState<string | null>(null);
 
   if (aislesLoading) {
     return (
-      <div className="glass-card p-6 h-[500px] flex items-center justify-center">
+      <div className="glass-card p-6 h-[600px] flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading store map...</div>
       </div>
     );
@@ -37,77 +42,114 @@ export function StoreMap() {
   const selectedAisleData = aisles?.find(a => a.id === selectedAisle);
   const productsInSelectedAisle = selectedAisle ? getProductsInAisle(selectedAisle) : [];
 
+  // Calculate SVG viewBox based on actual aisle positions
+  const maxX = Math.max(...(aisles?.map(a => a.position_x + a.width) || [800])) + 50;
+  const maxY = Math.max(...(aisles?.map(a => a.position_y + a.height) || [800])) + 100;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.3 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
       className="glass-card p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-primary text-white">
-          <MapPin className="h-5 w-5" />
+          <Store className="h-5 w-5" />
         </div>
         <div>
           <h3 className="text-lg font-semibold font-display">Store Layout</h3>
-          <p className="text-sm text-muted-foreground">Top-down aisle view</p>
+          <p className="text-sm text-muted-foreground">
+            Click an aisle to view products • {aisles?.length || 0} aisles • {products?.length || 0} products
+          </p>
         </div>
       </div>
 
-      <div className="flex gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* Store Map */}
-        <div className="flex-1 relative bg-secondary/30 rounded-xl p-4 min-h-[400px]">
+        <div className="relative bg-gradient-to-br from-secondary/40 to-secondary/20 rounded-xl p-4 min-h-[600px] border border-border/50">
           {/* Store border */}
-          <div className="absolute inset-4 border-2 border-dashed border-border rounded-lg" />
+          <div className="absolute inset-4 border-2 border-dashed border-border/60 rounded-lg pointer-events-none" />
           
-          {/* Entrance */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 bg-foreground text-background text-xs font-semibold rounded-t-lg">
+          {/* Entrance label */}
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 px-6 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-t-lg tracking-wider shadow-lg">
             ENTRANCE
           </div>
 
           {/* Aisles Grid */}
-          <svg viewBox="0 0 700 500" className="w-full h-full">
+          <svg viewBox={`0 0 ${maxX} ${maxY}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+            {/* Background grid pattern */}
+            <defs>
+              <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="hsl(var(--border))" strokeWidth="0.5" strokeOpacity="0.3" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+
             {aisles?.map((aisle, index) => {
-              const color = aisleColors[aisle.name] || 'hsl(220, 10%, 46%)';
+              const color = aisleColors[aisle.name] || 'hsl(220, 30%, 50%)';
               const productCount = getProductsInAisle(aisle.id).length;
               const isSelected = selectedAisle === aisle.id;
               
               return (
                 <motion.g
                   key={aisle.id}
-                  initial={{ opacity: 0, scale: 0.8 }}
+                  initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 * index }}
+                  transition={{ delay: 0.05 * index, duration: 0.3 }}
                   onClick={() => setSelectedAisle(isSelected ? null : aisle.id)}
                   style={{ cursor: 'pointer' }}
+                  className="group"
                 >
+                  {/* Shadow */}
+                  <rect
+                    x={aisle.position_x + 4}
+                    y={aisle.position_y + 4}
+                    width={aisle.width}
+                    height={aisle.height}
+                    rx={10}
+                    fill="black"
+                    fillOpacity={0.15}
+                  />
+                  
                   {/* Aisle rectangle */}
                   <rect
                     x={aisle.position_x}
                     y={aisle.position_y}
                     width={aisle.width}
                     height={aisle.height}
-                    rx={8}
+                    rx={10}
                     fill={color}
-                    fillOpacity={isSelected ? 0.9 : 0.6}
-                    stroke={isSelected ? 'white' : 'transparent'}
-                    strokeWidth={3}
-                    className="transition-all duration-200 hover:fill-opacity-80"
+                    fillOpacity={isSelected ? 1 : 0.75}
+                    stroke={isSelected ? 'white' : 'rgba(255,255,255,0.3)'}
+                    strokeWidth={isSelected ? 4 : 1}
+                    className="transition-all duration-300"
                   />
                   
                   {/* Shelves lines */}
                   {[1, 2, 3, 4].map(shelf => (
                     <line
                       key={shelf}
-                      x1={aisle.position_x + 10}
-                      y1={aisle.position_y + (shelf * aisle.height / 5)}
-                      x2={aisle.position_x + aisle.width - 10}
-                      y2={aisle.position_y + (shelf * aisle.height / 5)}
+                      x1={aisle.position_x + 12}
+                      y1={aisle.position_y + 50 + (shelf * (aisle.height - 60) / 5)}
+                      x2={aisle.position_x + aisle.width - 12}
+                      y2={aisle.position_y + 50 + (shelf * (aisle.height - 60) / 5)}
                       stroke="white"
-                      strokeOpacity={0.3}
-                      strokeWidth={1}
+                      strokeOpacity={0.25}
+                      strokeWidth={1.5}
+                      strokeDasharray="4,4"
                     />
                   ))}
+
+                  {/* Aisle label background */}
+                  <rect
+                    x={aisle.position_x + 8}
+                    y={aisle.position_y + 8}
+                    width={aisle.width - 16}
+                    height={38}
+                    rx={6}
+                    fill="rgba(0,0,0,0.25)"
+                  />
 
                   {/* Aisle label */}
                   <text
@@ -115,8 +157,9 @@ export function StoreMap() {
                     y={aisle.position_y + 25}
                     textAnchor="middle"
                     fill="white"
-                    fontSize={12}
-                    fontWeight="600"
+                    fontSize={11}
+                    fontWeight="700"
+                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
                   >
                     {aisle.name}
                   </text>
@@ -124,10 +167,10 @@ export function StoreMap() {
                   {/* Aisle number */}
                   <text
                     x={aisle.position_x + aisle.width / 2}
-                    y={aisle.position_y + 45}
+                    y={aisle.position_y + 40}
                     textAnchor="middle"
                     fill="white"
-                    fillOpacity={0.7}
+                    fillOpacity={0.8}
                     fontSize={10}
                   >
                     Aisle {aisle.aisle_number}
@@ -135,18 +178,19 @@ export function StoreMap() {
 
                   {/* Product count badge */}
                   <circle
-                    cx={aisle.position_x + aisle.width - 15}
-                    cy={aisle.position_y + 15}
-                    r={12}
+                    cx={aisle.position_x + aisle.width - 18}
+                    cy={aisle.position_y + aisle.height - 18}
+                    r={16}
                     fill="white"
+                    className="drop-shadow-lg"
                   />
                   <text
-                    x={aisle.position_x + aisle.width - 15}
-                    y={aisle.position_y + 19}
+                    x={aisle.position_x + aisle.width - 18}
+                    y={aisle.position_y + aisle.height - 13}
                     textAnchor="middle"
                     fill={color}
-                    fontSize={10}
-                    fontWeight="700"
+                    fontSize={12}
+                    fontWeight="800"
                   >
                     {productCount}
                   </text>
@@ -155,26 +199,35 @@ export function StoreMap() {
             })}
 
             {/* Checkout counters */}
-            {[1, 2, 3].map(counter => (
-              <rect
-                key={counter}
-                x={150 + counter * 120}
-                y={440}
-                width={80}
-                height={25}
-                rx={4}
-                fill="hsl(var(--foreground))"
-                fillOpacity={0.2}
-              />
+            {[1, 2, 3, 4].map(counter => (
+              <g key={counter}>
+                <rect
+                  x={120 + counter * 150}
+                  y={maxY - 55}
+                  width={100}
+                  height={30}
+                  rx={6}
+                  fill="hsl(var(--muted))"
+                  stroke="hsl(var(--border))"
+                  strokeWidth={1}
+                />
+                <text 
+                  x={170 + counter * 150} 
+                  y={maxY - 35} 
+                  textAnchor="middle" 
+                  fill="hsl(var(--muted-foreground))" 
+                  fontSize={10}
+                  fontWeight="500"
+                >
+                  Register {counter}
+                </text>
+              </g>
             ))}
-            <text x={350} y={458} textAnchor="middle" fill="hsl(var(--muted-foreground))" fontSize={10}>
-              Checkout
-            </text>
           </svg>
         </div>
 
         {/* Selected Aisle Info */}
-        <div className="w-72 space-y-4">
+        <div className="space-y-4">
           {selectedAisleData ? (
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -182,56 +235,81 @@ export function StoreMap() {
               className="space-y-4"
             >
               <div 
-                className="p-4 rounded-xl text-white"
-                style={{ backgroundColor: aisleColors[selectedAisleData.name] }}
+                className="p-5 rounded-xl text-white shadow-lg"
+                style={{ backgroundColor: aisleColors[selectedAisleData.name] || 'hsl(220, 30%, 50%)' }}
               >
-                <h4 className="font-semibold font-display">{selectedAisleData.name}</h4>
-                <p className="text-sm opacity-80">Aisle {selectedAisleData.aisle_number}</p>
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5" />
+                  <div>
+                    <h4 className="font-bold font-display text-lg">{selectedAisleData.name}</h4>
+                    <p className="text-sm opacity-80">Aisle {selectedAisleData.aisle_number}</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <h5 className="text-sm font-semibold flex items-center gap-2">
-                  <Package className="h-4 w-4" />
+                  <Package className="h-4 w-4 text-primary" />
                   Products ({productsInSelectedAisle.length})
                 </h5>
-                <div className="max-h-60 overflow-y-auto space-y-2">
-                  {productsInSelectedAisle.map(product => (
-                    <div 
-                      key={product.id}
-                      className="p-3 rounded-lg bg-secondary/50 text-sm"
-                    >
-                      <p className="font-medium">{product.name}</p>
-                      <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-                        <span>Shelf {product.shelf_position}</span>
-                        <span className="font-semibold text-foreground">
-                          ${Number(product.selling_price).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+                  {productsInSelectedAisle.length > 0 ? (
+                    productsInSelectedAisle.map((product, idx) => (
+                      <motion.div 
+                        key={product.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.03 }}
+                        className="p-3 rounded-lg bg-secondary/60 border border-border/50 hover:bg-secondary transition-colors"
+                      >
+                        <p className="font-medium text-sm">{product.name}</p>
+                        <div className="flex justify-between mt-1.5 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                            Shelf {product.shelf_position || 'N/A'}
+                          </span>
+                          <span className="font-bold text-foreground">
+                            ${Number(product.selling_price).toFixed(2)}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      No products in this aisle
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>
           ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              Click an aisle to view products
+            <div className="h-[200px] flex flex-col items-center justify-center text-muted-foreground text-sm gap-3 bg-secondary/30 rounded-xl border border-dashed border-border">
+              <MapPin className="h-8 w-8 opacity-50" />
+              <p>Click an aisle to view products</p>
             </div>
           )}
 
           {/* Legend */}
-          <div className="mt-4 p-4 rounded-xl bg-secondary/30">
-            <h5 className="text-xs font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Legend</h5>
+          <div className="p-4 rounded-xl bg-secondary/40 border border-border/50">
+            <h5 className="text-xs font-semibold mb-3 text-muted-foreground uppercase tracking-wide">
+              Aisle Legend
+            </h5>
             <div className="grid grid-cols-2 gap-2">
-              {Object.entries(aisleColors).map(([name, color]) => (
+              {Object.entries(aisleColors).slice(0, 10).map(([name, color]) => (
                 <div key={name} className="flex items-center gap-2">
                   <div 
-                    className="w-3 h-3 rounded-sm" 
+                    className="w-3 h-3 rounded-sm flex-shrink-0" 
                     style={{ backgroundColor: color }}
                   />
-                  <span className="text-xs truncate">{name}</span>
+                  <span className="text-xs truncate text-muted-foreground">{name}</span>
                 </div>
               ))}
             </div>
+            {Object.keys(aisleColors).length > 10 && (
+              <p className="text-xs text-muted-foreground mt-2 text-center">
+                +{Object.keys(aisleColors).length - 10} more
+              </p>
+            )}
           </div>
         </div>
       </div>
