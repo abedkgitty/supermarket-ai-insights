@@ -95,19 +95,19 @@ export function AIPredictionsPanel() {
           <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-center">
             <p className="text-xs text-muted-foreground">Revenue</p>
             <p className="text-lg font-bold text-accent">
-              ${metrics.totalRevenue.toLocaleString()}
+              ${(metrics.totalRevenue ?? 0).toLocaleString()}
             </p>
           </div>
           <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-center">
             <p className="text-xs text-muted-foreground">Profit</p>
             <p className="text-lg font-bold text-success">
-              ${metrics.totalProfit.toLocaleString()}
+              ${(metrics.totalProfit ?? 0).toLocaleString()}
             </p>
           </div>
           <div className="p-3 rounded-xl bg-warning/10 border border-warning/20 text-center">
             <p className="text-xs text-muted-foreground">Low Stock</p>
             <p className="text-lg font-bold text-warning">
-              {metrics.lowStockCount} items
+              {metrics.lowStockCount ?? 0} items
             </p>
           </div>
         </div>
