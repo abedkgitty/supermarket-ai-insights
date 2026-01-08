@@ -1,18 +1,30 @@
 import { motion } from 'framer-motion';
-import { Brain, TrendingUp, Sparkles, AlertCircle } from 'lucide-react';
-import { useAIPredictions } from '@/hooks/useFinancials';
-import { useFinancialSummary } from '@/hooks/useFinancials';
-import { format, parseISO } from 'date-fns';
+import { Brain, TrendingUp, Sparkles, AlertCircle, Package, DollarSign, ArrowUp, RefreshCw } from 'lucide-react';
+import { useAIInsights } from '@/hooks/useAIInsights';
+import { Button } from '@/components/ui/button';
+
+const typeIcons = {
+  revenue: DollarSign,
+  inventory: Package,
+  growth: ArrowUp,
+  warning: AlertCircle,
+};
+
+const typeColors = {
+  revenue: 'text-success bg-success/10 border-success/20',
+  inventory: 'text-warning bg-warning/10 border-warning/20',
+  growth: 'text-accent bg-accent/10 border-accent/20',
+  warning: 'text-destructive bg-destructive/10 border-destructive/20',
+};
+
+const priorityBadges = {
+  high: 'bg-destructive/20 text-destructive',
+  medium: 'bg-warning/20 text-warning',
+  low: 'bg-muted text-muted-foreground',
+};
 
 export function AIPredictionsPanel() {
-  const { data: predictions, isLoading } = useAIPredictions();
-  const { data: financials } = useFinancialSummary();
-
-  // Calculate predicted totals for next year
-  const currentYearSales = financials?.reduce((sum, f) => sum + Number(f.total_sales), 0) || 0;
-  const predictedGrowth = 0.18; // 18% predicted growth
-  const predictedNextYearSales = currentYearSales * (1 + predictedGrowth);
-  const predictedRevenue = predictions?.reduce((sum, p) => sum + Number(p.predicted_revenue), 0) || 0;
+  const { data, isLoading, error, refetch, isFetching } = useAIInsights();
 
   if (isLoading) {
     return (
@@ -21,10 +33,33 @@ export function AIPredictionsPanel() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-card p-6"
       >
-        <div className="animate-pulse">Loading AI predictions...</div>
+        <div className="flex items-center gap-3">
+          <div className="animate-spin">
+            <Brain className="h-5 w-5 text-accent" />
+          </div>
+          <span className="text-muted-foreground">AI is analyzing your data...</span>
+        </div>
       </motion.div>
     );
   }
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card p-6 border-l-4 border-l-destructive"
+      >
+        <p className="text-destructive">Failed to load AI insights. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-2">
+          Retry
+        </Button>
+      </motion.div>
+    );
+  }
+
+  const insights = data?.insights || [];
+  const metrics = data?.metrics;
 
   return (
     <motion.div
@@ -33,74 +68,84 @@ export function AIPredictionsPanel() {
       transition={{ duration: 0.5, delay: 0.4 }}
       className="glass-card p-6 border-l-4 border-l-accent"
     >
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-accent text-white">
-          <Brain className="h-5 w-5" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl gradient-accent text-white">
+            <Brain className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold font-display">AI Business Insights</h3>
+            <p className="text-sm text-muted-foreground">Powered by real-time analysis</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg font-semibold font-display">AI Predictions for 2026</h3>
-          <p className="text-sm text-muted-foreground">Machine learning forecasts</p>
-        </div>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => refetch()} 
+          disabled={isFetching}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-accent/20">
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-5 w-5 text-accent" />
-            <div>
-              <p className="text-sm font-medium">Predicted Annual Revenue</p>
-              <p className="text-xs text-muted-foreground">Based on trend analysis</p>
-            </div>
+      {metrics && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-center">
+            <p className="text-xs text-muted-foreground">Revenue</p>
+            <p className="text-lg font-bold text-accent">
+              ${metrics.totalRevenue.toLocaleString()}
+            </p>
           </div>
-          <p className="text-xl font-bold font-display text-accent">
-            ${predictedNextYearSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-          </p>
+          <div className="p-3 rounded-xl bg-success/10 border border-success/20 text-center">
+            <p className="text-xs text-muted-foreground">Profit</p>
+            <p className="text-lg font-bold text-success">
+              ${metrics.totalProfit.toLocaleString()}
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-warning/10 border border-warning/20 text-center">
+            <p className="text-xs text-muted-foreground">Low Stock</p>
+            <p className="text-lg font-bold text-warning">
+              {metrics.lowStockCount} items
+            </p>
+          </div>
         </div>
+      )}
 
-        <div className="flex items-center justify-between p-4 rounded-xl bg-success/10 border border-success/20">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-sm font-medium">Expected Growth</p>
-              <p className="text-xs text-muted-foreground">Year-over-year</p>
-            </div>
-          </div>
-          <p className="text-xl font-bold font-display text-success">+18%</p>
-        </div>
-
-        <div className="mt-6">
-          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-warning" />
-            Top Product Predictions
-          </h4>
-          <div className="space-y-2">
-            {predictions?.slice(0, 5).map((prediction, index) => (
-              <motion.div
-                key={prediction.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 + index * 0.1 }}
-                className="flex items-center justify-between p-3 rounded-lg bg-secondary/50"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-muted-foreground w-6">#{index + 1}</span>
-                  <span className="text-sm font-medium">{prediction.products?.name}</span>
+      <div className="space-y-3">
+        <h4 className="text-sm font-semibold flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-accent" />
+          AI Recommendations
+        </h4>
+        {insights.map((insight, index) => {
+          const Icon = typeIcons[insight.type] || AlertCircle;
+          const colorClass = typeColors[insight.type] || typeColors.warning;
+          const priorityClass = priorityBadges[insight.priority] || priorityBadges.medium;
+          
+          return (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + index * 0.1 }}
+              className={`p-4 rounded-xl border ${colorClass}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <Icon className="h-5 w-5 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">{insight.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{insight.description}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className="text-xs text-muted-foreground">
-                    {prediction.predicted_demand} units
-                  </span>
-                  <span className="text-sm font-semibold text-success">
-                    ${Number(prediction.predicted_revenue).toFixed(0)}
-                  </span>
-                  <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
-                    {(Number(prediction.confidence_score) * 100).toFixed(0)}% conf.
-                  </span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+                <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${priorityClass}`}>
+                  {insight.priority}
+                </span>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
