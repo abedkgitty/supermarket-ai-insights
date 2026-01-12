@@ -49,7 +49,7 @@ export function Sidebar() {
               animate={{ opacity: 1 }}
               className="overflow-hidden"
             >
-              <h1 className="font-display font-bold text-lg">MarketAI</h1>
+              <h1 className="font-display font-bold text-lg">MercatoMind</h1>
               <p className="text-xs text-muted-foreground">Analytics Platform</p>
             </motion.div>
           )}
