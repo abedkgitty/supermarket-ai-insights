@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Loader2, Bot, User, Code } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Bot, User, Code, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+
+interface QueryResult {
+  [key: string]: any;
+}
 
 interface Message {
   id: string;
@@ -12,6 +16,8 @@ interface Message {
   content: string;
   sql?: string;
   explanation?: string;
+  results?: QueryResult[] | null;
+  resultsError?: string | null;
   type?: "query" | "summary" | "declined" | "error";
 }
 
@@ -91,6 +97,8 @@ export function ChatBubble() {
         content: data.response || data.explanation || "Here's what I found:",
         sql: data.sql,
         explanation: data.explanation,
+        results: data.results,
+        resultsError: data.resultsError,
         type: data.type,
       };
 
@@ -113,6 +121,65 @@ export function ChatBubble() {
       e.preventDefault();
       sendMessage();
     }
+  };
+
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) return "—";
+    if (typeof value === "number") {
+      return value.toLocaleString();
+    }
+    if (typeof value === "object") {
+      return JSON.stringify(value);
+    }
+    return String(value);
+  };
+
+  const renderResults = (results: QueryResult[]) => {
+    if (!results || results.length === 0) {
+      return (
+        <div className="text-sm text-muted-foreground italic">No results found</div>
+      );
+    }
+
+    const columns = Object.keys(results[0]);
+    
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-border/50">
+              {columns.slice(0, 5).map((col) => (
+                <th key={col} className="px-2 py-1.5 text-left font-medium text-muted-foreground">
+                  {col.replace(/_/g, " ")}
+                </th>
+              ))}
+              {columns.length > 5 && (
+                <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">...</th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {results.slice(0, 10).map((row, i) => (
+              <tr key={i} className="border-b border-border/30 last:border-0">
+                {columns.slice(0, 5).map((col) => (
+                  <td key={col} className="px-2 py-1.5 text-foreground max-w-[120px] truncate">
+                    {formatValue(row[col])}
+                  </td>
+                ))}
+                {columns.length > 5 && (
+                  <td className="px-2 py-1.5 text-muted-foreground">...</td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {results.length > 10 && (
+          <div className="mt-2 text-xs text-muted-foreground text-center">
+            Showing 10 of {results.length} results
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -167,7 +234,7 @@ export function ChatBubble() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-2xl border bg-card shadow-2xl"
+            className="fixed bottom-24 right-6 z-50 w-[480px] max-w-[calc(100vw-3rem)] overflow-hidden rounded-2xl border bg-card shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center gap-3 border-b bg-gradient-to-r from-primary/10 to-primary/5 px-4 py-3">
@@ -181,7 +248,7 @@ export function ChatBubble() {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="h-[350px] p-4" ref={scrollRef}>
+            <ScrollArea className="h-[480px] p-4" ref={scrollRef}>
               <div className="flex flex-col gap-4">
                 {messages.map((message) => (
                   <div
@@ -198,7 +265,7 @@ export function ChatBubble() {
                     )}
                     <div
                       className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-2",
+                        "max-w-[90%] rounded-2xl px-4 py-3",
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-foreground"
@@ -209,13 +276,30 @@ export function ChatBubble() {
                       {/* SQL Display */}
                       {message.sql && (
                         <div className="mt-3 rounded-lg bg-background/80 p-3">
-                          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                            <Code className="h-3 w-3" />
+                          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <Code className="h-3.5 w-3.5" />
                             <span>SQL Query</span>
                           </div>
-                          <pre className="overflow-x-auto text-xs font-mono text-foreground">
+                          <pre className="overflow-x-auto text-xs font-mono text-foreground whitespace-pre-wrap break-all">
                             {message.sql}
                           </pre>
+                        </div>
+                      )}
+
+                      {/* Results Display */}
+                      {message.type === "query" && (
+                        <div className="mt-3 rounded-lg bg-background/80 p-3">
+                          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                            <Database className="h-3.5 w-3.5" />
+                            <span>Results</span>
+                          </div>
+                          {message.resultsError ? (
+                            <div className="text-sm text-destructive">{message.resultsError}</div>
+                          ) : message.results ? (
+                            renderResults(message.results)
+                          ) : (
+                            <div className="text-sm text-muted-foreground italic">No data available</div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -231,7 +315,7 @@ export function ChatBubble() {
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20">
                       <Bot className="h-4 w-4 text-primary" />
                     </div>
-                    <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-2">
+                    <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-3">
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
                       <span className="text-sm text-muted-foreground">Thinking...</span>
                     </div>
@@ -248,7 +332,7 @@ export function ChatBubble() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask about products, sales..."
+                  placeholder="Ask about products, sales, inventory..."
                   disabled={isLoading}
                   className="flex-1 rounded-full border-muted-foreground/20 bg-muted/50 px-4"
                 />
