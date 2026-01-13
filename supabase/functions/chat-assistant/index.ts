@@ -20,13 +20,14 @@ RULES:
 1. ONLY answer questions related to supermarket data, products, sales, inventory, categories, aisles, and analytics.
 2. If asked something unrelated (politics, weather, general knowledge, etc.), politely decline and redirect to supermarket topics.
 3. When a question requires data, generate a safe SELECT SQL query. Never generate INSERT, UPDATE, DELETE, DROP, or any modifying statements.
-4. Always wrap SQL in a JSON response format.
+4. Keep queries simple and efficient. Use JOINs when needed to get related data (e.g., product names with sales).
+5. Always respond in valid JSON format.
 
 RESPONSE FORMAT:
 For data queries, respond with JSON:
 {
   "type": "query",
-  "sql": "SELECT ... FROM ...",
+  "sql": "SELECT ... FROM ... (valid PostgreSQL query)",
   "explanation": "Brief explanation of what this query does"
 }
 
@@ -41,6 +42,78 @@ For out-of-scope questions:
   "type": "declined",
   "response": "I'm MercatoMind's assistant, focused on supermarket analytics. I can help you with product information, sales data, inventory levels, and business insights. What would you like to know about your store?"
 }`;
+
+async function executeQuery(supabase: any, sql: string): Promise<{ data: any; error: string | null }> {
+  // Parse the SQL to determine which table and what to select
+  const sqlLower = sql.toLowerCase().trim();
+  
+  // Security: only allow SELECT
+  if (!sqlLower.startsWith("select")) {
+    return { data: null, error: "Only SELECT queries are allowed" };
+  }
+
+  try {
+    // Use Postgres function to run read-only query
+    const { data, error } = await supabase.rpc('run_readonly_query', { sql_query: sql });
+    
+    if (error) {
+      // Fallback: try direct table queries for simple cases
+      return await executeSimpleQuery(supabase, sql);
+    }
+    
+    return { data, error: null };
+  } catch (e) {
+    return await executeSimpleQuery(supabase, sql);
+  }
+}
+
+async function executeSimpleQuery(supabase: any, sql: string): Promise<{ data: any; error: string | null }> {
+  const sqlLower = sql.toLowerCase();
+  
+  try {
+    // Extract table name
+    const fromMatch = sqlLower.match(/from\s+(\w+)/);
+    if (!fromMatch) {
+      return { data: null, error: "Could not parse table name" };
+    }
+    
+    const tableName = fromMatch[1];
+    const allowedTables = ['products', 'sales', 'categories', 'aisles', 'financial_summary', 'ai_predictions'];
+    
+    if (!allowedTables.includes(tableName)) {
+      return { data: null, error: "Table not allowed" };
+    }
+
+    // Build query
+    let query = supabase.from(tableName).select('*');
+    
+    // Check for LIMIT
+    const limitMatch = sqlLower.match(/limit\s+(\d+)/);
+    if (limitMatch) {
+      query = query.limit(parseInt(limitMatch[1]));
+    } else {
+      query = query.limit(20); // Default limit
+    }
+
+    // Check for ORDER BY
+    const orderMatch = sql.match(/order\s+by\s+(\w+)(?:\s+(asc|desc))?/i);
+    if (orderMatch) {
+      const column = orderMatch[1];
+      const ascending = orderMatch[2]?.toLowerCase() !== 'desc';
+      query = query.order(column, { ascending });
+    }
+
+    const { data, error } = await query;
+    
+    if (error) {
+      return { data: null, error: error.message };
+    }
+    
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e instanceof Error ? e.message : "Query execution failed" };
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -58,10 +131,12 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+
     // Build messages array with history
     const messages = [
       { role: "system", content: SYSTEM_PROMPT },
-      ...conversationHistory.slice(-10), // Keep last 10 messages for context
+      ...conversationHistory.slice(-10),
       { role: "user", content: message },
     ];
 
@@ -100,65 +175,30 @@ serve(async (req) => {
     // Parse AI response
     let parsedResponse;
     try {
-      // Extract JSON from response (handle markdown code blocks)
       const jsonMatch = aiContent.match(/```json\s*([\s\S]*?)\s*```/) || 
                         aiContent.match(/```\s*([\s\S]*?)\s*```/) ||
                         [null, aiContent];
       parsedResponse = JSON.parse(jsonMatch[1] || aiContent);
     } catch {
-      // If parsing fails, treat as summary
       parsedResponse = { type: "summary", response: aiContent };
     }
 
     // If it's a query, execute it
     if (parsedResponse.type === "query" && parsedResponse.sql) {
-      // Security check - only allow SELECT
-      const sqlLower = parsedResponse.sql.toLowerCase().trim();
-      if (!sqlLower.startsWith("select")) {
-        return new Response(
-          JSON.stringify({
-            type: "error",
-            response: "For security reasons, only SELECT queries are allowed.",
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Execute the query
-      const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
+      const { data, error } = await executeQuery(supabase, parsedResponse.sql);
       
-      // Use raw SQL via rpc or direct query
-      const { data, error } = await supabase.rpc('execute_readonly_query', { 
-        query_text: parsedResponse.sql 
-      }).maybeSingle();
-
-      if (error) {
-        // Fallback: try to parse and execute via the client
-        // For now, return the SQL for display
-        return new Response(
-          JSON.stringify({
-            type: "query",
-            sql: parsedResponse.sql,
-            explanation: parsedResponse.explanation,
-            results: null,
-            error: "Query execution not available. SQL shown for reference.",
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
       return new Response(
         JSON.stringify({
           type: "query",
           sql: parsedResponse.sql,
           explanation: parsedResponse.explanation,
           results: data,
+          resultsError: error,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Return summary or declined response
     return new Response(JSON.stringify(parsedResponse), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
