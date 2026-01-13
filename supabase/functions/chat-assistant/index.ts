@@ -74,8 +74,15 @@ CRITICAL RULES:
 
 EXAMPLE VALID QUERIES:
 - Products with low stock: SELECT name, stock_quantity, min_stock_level FROM products WHERE stock_quantity < min_stock_level LIMIT 20
-- Sales by product: SELECT p.name, SUM(s.quantity) as total_sold FROM sales s JOIN products p ON s.product_id = p.id GROUP BY p.name LIMIT 20
-- Products in category: SELECT p.name, c.name as category FROM products p JOIN categories c ON p.category_id = c.id LIMIT 20
+- Total sales per product: SELECT p.name, SUM(s.quantity) as qty_sold, SUM(s.total_amount) as revenue FROM sales s JOIN products p ON s.product_id = p.id GROUP BY p.id, p.name ORDER BY revenue DESC LIMIT 20
+- Products in category: SELECT p.name, p.selling_price, c.name as category FROM products p JOIN categories c ON p.category_id = c.id LIMIT 20
+- Recent sales: SELECT s.sale_date, s.quantity, s.total_amount, p.name FROM sales s JOIN products p ON s.product_id = p.id ORDER BY s.sale_date DESC LIMIT 20
+- Monthly financials: SELECT month, total_sales, total_costs, total_profit FROM financial_summary ORDER BY month DESC LIMIT 12
+
+IMPORTANT COLUMN NOTES:
+- sales table has: quantity (units sold), total_amount (money earned) - NOT "total_sold"
+- products table has: stock_quantity (current stock), selling_price, cost_price - NOT "price"
+- Use SUM(s.quantity) for total units sold, SUM(s.total_amount) for total revenue
 
 RESPONSE FORMAT (always valid JSON):
 For queries: {"type": "query", "sql": "SELECT ...", "explanation": "Brief explanation"}
