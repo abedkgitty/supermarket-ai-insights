@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Sidebar } from './Sidebar';
+import { ChatBubble } from '../chat/ChatBubble';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -14,6 +15,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {children}
         </div>
       </main>
+      <ChatBubble />
     </div>
   );
 }
